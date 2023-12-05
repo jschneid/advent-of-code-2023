@@ -11,16 +11,12 @@ class MapEntry:
         delta = destination_index - self.destination_range_start
         return self.source_range_start + delta
     
-    # def __lt__(self, other):
-    #     return self.destination_range_start < other.destination_range_start
-
 class Map:
     def __init__(self):
         self.map_entries = []
 
     def add_map_entry(self, map_entry):
         self.map_entries.append(map_entry)
-        # self.map_entries = sorted(self.map_entries)
 
     def source_index(self, destination_index):
         for map_entry in self.map_entries:
