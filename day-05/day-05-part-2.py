@@ -4,15 +4,15 @@ class MapEntry:
         self.source_range_start = source_range_start
         self.range_length = range_length
 
-    def in_source_range(self, source_index):
-        return source_index >= self.source_range_start and source_index < self.source_range_start + self.range_length
+    def in_destination_range(self, destination_index):
+        return destination_index >= self.destination_range_start and destination_index < self.destination_range_start + self.range_length
     
-    def destination_index(self, source_index):
-        delta = source_index - self.source_range_start
-        return self.destination_range_start + delta
+    def source_index(self, destination_index):
+        delta = destination_index - self.destination_range_start
+        return self.source_range_start + delta
     
-    def __str__(self):
-        return f"{self.destination_range_start} {self.source_range_start} {self.range_length}"
+    # def __lt__(self, other):
+    #     return self.destination_range_start < other.destination_range_start
 
 class Map:
     def __init__(self):
@@ -20,33 +20,22 @@ class Map:
 
     def add_map_entry(self, map_entry):
         self.map_entries.append(map_entry)
+        # self.map_entries = sorted(self.map_entries)
 
-    def destination_index(self, source_index):
+    def source_index(self, destination_index):
         for map_entry in self.map_entries:
-            if map_entry.in_source_range(source_index):
-                return map_entry.destination_index(source_index)
-        return source_index
-    
-    def __str__(self):
-        result = ""
-        for map_entry in self.map_entries:
-            result += map_entry.__str__()
-            result += "\n"
-        return result
+            if map_entry.in_destination_range(destination_index):
+                return map_entry.source_index(destination_index)
+        return destination_index
 
 def read_input_file_lines():
     with open('input.txt') as file:
         lines = [line.rstrip() for line in file]
     return lines
 
-def read_seeds(lines):
+def read_seed_ranges(lines):
     range_bounds = [int(range_bound) for range_bound in lines[0][7:].split()]
-    seed_ranges = [range_bounds[index:index + 2] for index in range(0, len(range_bounds), 2)]
-    seeds = []
-    for seed_range in seed_ranges:
-        for index in range(seed_range[0], seed_range[0] + seed_range[1]):
-            seeds.append(index)
-    return seeds
+    return [range_bounds[index:index + 2] for index in range(0, len(range_bounds), 2)]
 
 def read_maps(lines):
     maps = []
@@ -63,21 +52,27 @@ def read_maps(lines):
     
     return maps;
 
-def seed_location(seed, maps):
-    index = seed
-    for map in maps:
-        index = map.destination_index(index)
+def seed_for_location(location, maps):
+    index = location
+    for map in reversed(maps):
+        index = map.source_index(index)
     return index
 
-def closest_seed_location(seed_locations):
-    return min(seed_locations)
+def is_in_range(seed, seed_ranges):
+    for seed_range in seed_ranges:
+        if seed >= seed_range[0] and seed < seed_range[0] + seed_range[1]:
+            return True
+    return False
+
+def closest_seed_location(maps, seed_ranges):
+    location = 0 
+    while(True):
+        seed = seed_for_location(location, maps)
+        if is_in_range(seed, seed_ranges):
+            return location
+        location += 1
 
 lines = read_input_file_lines()
-seeds = read_seeds(lines)
+seed_ranges = read_seed_ranges(lines)
 maps = read_maps(lines)
-seed_locations = [seed_location(seed, maps) for seed in seeds]
-print (closest_seed_location(seed_locations))
-
-# Do I need to work backwards instead, from each possible location value, back through
-# the map, to see if it corresponds to one of the seeds in range?
-# I could bail out as soon as I get a hit, since that'll be the lowest!
+print(closest_seed_location(maps, seed_ranges))
