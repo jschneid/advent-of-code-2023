@@ -65,6 +65,9 @@ def closest_seed_location(maps, seed_ranges):
     while(True):
         seed = seed_for_location(location, maps)
         if is_in_range(seed, seed_ranges):
+            # As soon as we find a location which has a seed in the given ranges: We're done!
+            # Since we're evaluating locations in ascending order starting from 0, the first
+            # location we find is the minimum, and we can stop processing.
             return location
         location += 1
 
