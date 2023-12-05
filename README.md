@@ -1,5 +1,5 @@
 # advent-of-code-2023
-Python solutions for https://adventofcode.com/2023
+Python 3 solutions for https://adventofcode.com/2023
 
 This is my first time ever writing Python code! Pointers on how to make any of this code more Pythonic are welcome!
 
