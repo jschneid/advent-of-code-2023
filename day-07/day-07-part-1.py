@@ -45,14 +45,10 @@ class Hand:
     def __lt__(self, other):
         if self.strength() != other.strength():
             return self.strength() < other.strength()
-        for index in range(0, 4):
+        for index in range(0, 5):
             if self.cards[index] != other.cards[index]:
                 return self.cards[index] < other.cards[index]
         return False
-    
-    def __str__(self):
-        return(f"{self.cards}, strength={self.strength()}")
-        
     
 def read_input_file_lines():
     with open('input.txt') as file:
@@ -70,12 +66,9 @@ def winnings(hands):
     sorted_hands = sorted(hands)
     winnings = 0
     for rank, hand in enumerate(sorted_hands, start = 1):
-        print(hand)
         winnings += hand.bid * rank
     return winnings
 
 lines = read_input_file_lines()
 hands = hands_from_lines(lines)
 print(winnings(hands))
- 
-# 249724671 too low
