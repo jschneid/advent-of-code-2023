@@ -8,6 +8,9 @@ class Point:
     
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
+    
+    def __hash__(self):
+        return self.x + 200 * self.y
 
 def read_input_file_lines():
     with open('input.txt') as file:
@@ -84,7 +87,7 @@ def points_and_vertices_in_path(lines):
         next_point = next_point_from_point(lines, current_point, previous_point)
         previous_point = current_point
         current_point = next_point
-    return points, vertices
+    return set(points), vertices
 
 # Adapted from https://stackoverflow.com/a/50352869/12484 
 # Uses "Polygon ray casting".
@@ -104,9 +107,9 @@ def polygon_ray_casting(points_in_path, verticies, max_x, max_y):
     # For every candidate position within the bounding box
     for testy in range(0, max_y):
        for testx in range(0, max_x):
-            if testx == 0:
-                print(f"checking y={testy}")
-            if any(point.x == testx and point.y == testy for point in points_in_path):
+            # The algorithm below returns True for many (possibly all?) points on the polygon's edges.
+            # Therefore, manually exlude those points from our results. 
+            if Point(testx, testy) in points_in_path:
                 continue
 
             c = 0
@@ -117,9 +120,7 @@ def polygon_ray_casting(points_in_path, verticies, max_x, max_y):
             # If odd, that means that we are inside the polygon
             if c % 2 == 1: 
                 points_inside += 1
-                print(f'(x={testx}, y={testy})')
-                print(points_inside)
-
+                
     return points_inside
     
 lines = read_input_file_lines()
