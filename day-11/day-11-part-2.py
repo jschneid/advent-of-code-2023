@@ -1,10 +1,9 @@
+import itertools    
+
 class Point:
     def __init__(self, x, y):
         self.x = x
         self.y = y
-
-    def __lt__(self, other):
-        return self.y < other.y or (self.y == other.y and self.x < other.x)
     
 def read_input_file_lines():
     with open('input.txt') as file:
@@ -38,10 +37,7 @@ def expand_the_universe(galaxies, max_x, max_y):
             expand_universe_vertically(galaxies, y)
         
 def galaxy_pairs(galaxies):
-    for galaxy in galaxies:
-        for other_galaxy in galaxies:
-            if galaxy < other_galaxy:
-                yield (galaxy, other_galaxy)
+    return itertools.combinations(galaxies, 2)
 
 def manhattan_distance(point1, point2):
     return abs(point1.x - point2.x) + abs(point1.y - point2.y)
