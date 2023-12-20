@@ -1,10 +1,3 @@
-class MachinePart:
-    def __init__(self, x, m, a, s):
-        self.x = x
-        self.m = m
-        self.a = a
-        self.s = s
-
 class Rule:
     def __init__(self, rule_string):
         split_rule_string = rule_string.split(':')
@@ -19,26 +12,6 @@ class Rule:
             self.compare_value = None
             self.destination_workflow_id = rule_string
 
-    def apply_to(self, machine_part):
-        if self.category == None:
-            return self.destination_workflow_id
-        elif self.category == 'x':
-            part_value = machine_part.x
-        elif self.category == 'm':
-            part_value = machine_part.m
-        elif self.category == 'a':
-            part_value = machine_part.a
-        elif self.category == 's':
-            part_value = machine_part.s
-        
-        if self.operator == '<':
-            if part_value < self.compare_value:
-                return self.destination_workflow_id
-        elif self.operator == '>':
-            if part_value > self.compare_value:
-                return self.destination_workflow_id
-        return None
-
 class Workflow:
     def __init__(self, line):
         self.id = line.split('{')[0]
@@ -50,6 +23,85 @@ class Workflow:
 
     def next_workflow_id(self, part):
         return None
+
+class PossibilityRanges:
+    def __init__(self, min_x, max_x, min_m, max_m, min_a, max_a, min_s, max_s):
+        self.min_x = min_x
+        self.max_x = max_x
+        self.min_m = min_m
+        self.max_m = max_m
+        self.min_a = min_a
+        self.max_a = max_a
+        self.min_s = min_s
+        self.max_s = max_s
+
+    def possibility_count(self):
+        if self.min_x > self.max_x or self.min_m > self.max_m or self.min_a > self.max_a or self.min_s > self.max_s:
+            return 0
+        return (self.max_x - self.min_x + 1) * (self.max_m - self.min_m + 1) * (self.max_a - self.min_a + 1) * (self.max_s - self.min_s + 1)    
+
+    def clone(self):
+        return PossibilityRanges(self.min_x, self.max_x, self.min_m, self.max_m, self.min_a, self.max_a, self.min_s, self.max_s)
+
+    def constrain_by(self, rule):
+        if rule.category == 'x':
+            if rule.operator == '<':
+                if self.max_x >= rule.compare_value:
+                    self.max_x = rule.compare_value - 1
+            else:
+                if self.min_x <= rule.compare_value:
+                    self.min_x = rule.compare_value + 1
+        elif rule.category == 'm':
+            if rule.operator == '<':
+                if self.max_m >= rule.compare_value:
+                    self.max_m = rule.compare_value - 1
+            else:
+                if self.min_m <= rule.compare_value:
+                    self.min_m = rule.compare_value + 1
+        elif rule.category == 'a':
+            if rule.operator == '<':
+                if self.max_a >= rule.compare_value:
+                    self.max_a = rule.compare_value - 1
+            else:
+                if self.min_a <= rule.compare_value:
+                    self.min_a = rule.compare_value + 1
+        elif rule.category == 's':
+            if rule.operator == '<':
+                if self.max_s >= rule.compare_value:
+                    self.max_s = rule.compare_value - 1
+            else:
+                if self.min_s <= rule.compare_value:
+                    self.min_s = rule.compare_value + 1
+
+    def constrain_by_failed(self, rule):
+        if rule.category == 'x':
+            if rule.operator == '<':
+                if self.min_x < rule.compare_value:
+                    self.min_x = rule.compare_value
+            else:
+                if self.max_x > rule.compare_value:
+                    self.max_x = rule.compare_value
+        elif rule.category == 'm':
+            if rule.operator == '<':
+                if self.min_m < rule.compare_value:
+                    self.min_m = rule.compare_value
+            else:
+                if self.max_m > rule.compare_value:
+                    self.max_m = rule.compare_value
+        elif rule.category == 'a':
+            if rule.operator == '<':
+                if self.min_a < rule.compare_value:
+                    self.min_a = rule.compare_value
+            else:
+                if self.max_a > rule.compare_value:
+                    self.max_a = rule.compare_value
+        elif rule.category == 's':
+            if rule.operator == '<':
+                if self.min_s < rule.compare_value:
+                    self.min_s = rule.compare_value
+            else:
+                if self.max_s > rule.compare_value:
+                    self.max_s = rule.compare_value
 
 def read_input_file_lines():
     with open('input.txt') as file:
@@ -68,117 +120,48 @@ def add_workflow_from_line(workflows, line):
     workflows[workflow.id] = workflow    
     return
 
-def replace_workflow_id(workflows, old_workflow_id, new_workflow_id):
-    for workflow in workflows.values():
-        for rule in workflow.rules:
-            if rule.destination_workflow_id == old_workflow_id:
-                rule.destination_workflow_id = new_workflow_id
-
-def condense_workflows(workflows):
-    while True:
-        workflows_count = len(workflows)
-
-        workflow_ids_to_delete = set()
-        for workflow_id, workflow in workflows.items():
-            destination_workflow_ids = set()
-            for rule in workflow.rules:
-                destination_workflow_ids.add(rule.destination_workflow_id)
-            if len(destination_workflow_ids) == 1:
-                new_workflow_id = destination_workflow_ids.pop()
-                replace_workflow_id(workflows, workflow_id, new_workflow_id)
-                workflow_ids_to_delete.add(workflow_id)
-
-        for workflow_id in workflow_ids_to_delete:
-            del workflows[workflow_id]
-
-        if len(workflows) == workflows_count:
-            break
-
-def next_workflow_id(workflow, part):
+# Trying to loop though each combination of possible x, m, a, s values would take way too long
+# (even after applying various optimizations -- attempts at which can be seen in older commits
+# of this file!). Therefore, this alternative approach:
+#
+# Set up a data structure with the minimum and maximum possible remaining values for each of 
+# x, m, a, s. Walk the tree of workflows. Each time we encounter a rule, reduce the corresponding
+# min or max value by the rule. For example, if we see the rule "x>10", then if we follow that 
+# rule to the next workflow node, we know that the minimum possible value for x is 11.
+#
+# Similarly, when we _fail_ a rule check, we also need to adjust the data structure. For example,
+# if we fail the check in the rule "x>10" and go on to the next rule, then the maximum possible 
+# value for x is 10.
+#
+# We do need to clone the possibility_ranges data structure at each check, so that different paths
+# through the tree of workflows don't affect one another.
+#
+# Finally, when we reach an "A", we can add to our count of total possibilities the product of the 
+# remaining ranges of each of the x, m, a, s values.
+def possibility_count_at(workflow, possibility_ranges, workflows):
+    total_possibilities = 0
+    failed_rules = []
     for rule in workflow.rules:
-        next_workflow_id = rule.apply_to(part)
-        if next_workflow_id != None:
-            return next_workflow_id
+        updated_possibility_ranges = possibility_ranges.clone()
+            
+        if rule.category != None:
+            updated_possibility_ranges.constrain_by(rule)
 
-def is_accepted(part, workflows):
-    workflow_id = 'in'
-    while workflow_id not in {'A', 'R'}:
-        workflow_id = next_workflow_id(workflows[workflow_id], part)
-    return workflow_id == 'A'
+        for failed_rule in failed_rules:
+            updated_possibility_ranges.constrain_by_failed(failed_rule)
+
+        if rule.destination_workflow_id == 'A':
+            total_possibilities += updated_possibility_ranges.possibility_count()
+        elif rule.destination_workflow_id == 'R':
+            total_possibilities += 0
+        else:
+            total_possibilities += possibility_count_at(workflows[rule.destination_workflow_id], updated_possibility_ranges, workflows)
+
+        failed_rules.append(rule)
+
+    return total_possibilities
 
 lines = read_input_file_lines()
-
 workflows = workflows_from_lines(lines)
-condense_workflows(workflows)
-
-x_values = set()
-m_values = set()
-a_values = set()
-s_values = set()
-for workflow in workflows.values():
-    for rule in workflow.rules:
-        if rule.category == 'x':
-            x_values.add(rule.compare_value)
-            if rule.operator == '<':
-                x_values.add(rule.compare_value - 1)
-            else:
-                x_values.add(rule.compare_value + 1)
-        if rule.category == 'm':
-            m_values.add(rule.compare_value)
-            if rule.operator == '<':
-                m_values.add(rule.compare_value - 1)
-            else:
-                m_values.add(rule.compare_value + 1)
-        if rule.category == 'a':
-            a_values.add(rule.compare_value)
-            if rule.operator == '<':
-                a_values.add(rule.compare_value - 1)
-            else:
-                a_values.add(rule.compare_value + 1)
-        if rule.category == 's':
-            s_values.add(rule.compare_value)
-            if rule.operator == '<':
-                s_values.add(rule.compare_value - 1)
-            else:
-                s_values.add(rule.compare_value + 1)
-
-# These need to be 0 and not 1 for the calculation to be correct for the lowest portion
-# of each range.
-x_values.add(0)
-m_values.add(0)
-a_values.add(0)
-s_values.add(0)
-x_values.add(4000)
-m_values.add(4000)
-a_values.add(4000)
-s_values.add(4000)
-x_values = sorted(x_values)
-m_values = sorted(m_values)
-a_values = sorted(a_values)
-s_values = sorted(s_values)
-
-print(f"x_values: {len(x_values)}")
-print(f'iterations: {len(x_values) * len(m_values) * len(a_values) * len(s_values)}')
-
-# TODO: Still too many iterations. 
-
-total_accepted_range_combinations = 0
-for x_index in range(1, len(x_values)):
-    print (f"Processing x_index: {x_index}")
-    x = x_values[x_index]
-    previous_x = x_values[x_index - 1]
-    for m_index in range(1, len(m_values)):
-        m = m_values[m_index]
-        previous_m = m_values[m_index - 1]
-        for a_index in range(1, len(a_values)):
-            a = a_values[a_index]
-            previous_a = a_values[a_index - 1]
-            for s_index in range(1, len(s_values)):
-                s = s_values[s_index]
-                previous_s = s_values[s_index - 1]
-                machine_part = MachinePart(x, m, a, s)
-                if is_accepted(machine_part, workflows):
-                    total_accepted_range_combinations += (x - previous_x) * (m - previous_m) * (a - previous_a) * (s - previous_s)
-                    
-print(total_accepted_range_combinations)
-
+possibility_ranges = PossibilityRanges(1, 4000, 1, 4000, 1, 4000, 1, 4000)
+print(possibility_count_at(workflows['in'], possibility_ranges, workflows))
