@@ -60,6 +60,12 @@ class ConjunctionModule:
     def pulse(self, value, input_module_id):
         self.input_module_states[input_module_id] = value
 
+
+        # Debug logging hack for Day 20 Part 2 -- see explanation in the comment below!
+        if self.id == 'bn' and value == 1:
+            print(f'{datetime.datetime.now().time()} bn: incoming high pulse! source: {input_module_id} button_presses: {button_presses} states: {self.input_module_states}')
+
+
         if 0 in self.input_module_states.values():
             outgoing_pulse_value = 1
         else:
@@ -116,8 +122,37 @@ def add_broadcast_module_from_line(modules, line, pulse_queue):
     destination_module_ids = line.split(' -> ')[1].split(', ')
     modules['broadcaster'] = BroadcastModule(destination_module_ids, pulse_queue)
 
+# For Day 20 Part 2, our goal is to find the first count of button presses following 
+# which a low pulse is sent to the 'rx' module.
+#
+# In my input data, there's a single module which can send a signal to 'rx': '&bn'.
+#
+# '&bn' is a conjunction module, which sends a low pulse to 'rx' when it's most recent 
+# pulse value from every one of its input modules were high.
+#
+# In my input data, '&bn' has 4 input modules: 'pl', 'mz', 'lz', and 'zm'. If each one 
+# of those sends a high pulse to 'bn' on a regular cycle, then our solution will be the 
+# product of each of those four cycle values, after adjusting for their respective offsets
+# (the point at which their respective cycles become stable, i.e. begin having the same 
+# delta between occurrences each time) from the first cycle.
+#
+# It turns out that, as with my input for 2023 Day 8, things were made easy for us: The
+# offset for each of the 4 input modules we care about is 0. 
+#    
+# For 4 arbitrary values, we'd do a least-common-multiple calculation to find the first value
+# where the cycle lengths coincide; but in this problem, all 4 values are prime numbers! 
+# So we can just multiply the 4 cycle lengths together to find our solution.
+#
+# Rather than adjust my code to do this, I just did a quick hack to my Day 20 Part 1 code, making
+# the button_presses variable global (not a normal best practice!), and then logged each button 
+# press count each time that '&bn' received a high pulse. I recorded the values in a spreadsheet:
+# https://docs.google.com/spreadsheets/d/1bTJY19cN0Pt1iHrUppGqDtnBPTp357h_1ajHDjh5aOw/edit#gid=0
+#
+# The product of those 4 cycle lengths was my correct solution!
 def button_presses_to_send_low_pulse_to_rx(modules, pulse_queue):
+    global button_presses 
     button_presses = 0
+
     while True:
         button_presses += 1 
         initial_pulse = Pulse('button', 'broadcaster', 0)
