@@ -41,15 +41,34 @@ def brick_at(bricks, x, y, z):
             return brick
     return None
 
-def plummet(brick):
-    while brick.z0 > 1 and len(bricks_below(brick)) == 0:
-        brick.z0 -= 1
-        brick.z1 -= 1
-    return
+def drop_brick_to(brick, destination_z0, occupied_cubes):
+    remove_occupied_cubes(brick, occupied_cubes)
+    delta = brick.z0 - destination_z0
+    brick.z1 = brick.z1 - delta
+    brick.z0 = destination_z0
+    add_occupied_cubes(brick, occupied_cubes)
 
-def plummet_all(bricks):
+def cubes_below_brick_unoccupied(brick, destination_z0, occupied_cubes):
+    for x in range(brick.x0, brick.x1 + 1):
+        for y in range(brick.y0, brick.y1 + 1):
+            if is_occupied(x, y, destination_z0, occupied_cubes):
+                return False
+    return True
+
+def plummet(brick, occupied_cubes):
+    destination_z0 = brick.z0
+
+    while cubes_below_brick_unoccupied(brick, destination_z0 - 1, occupied_cubes):
+        destination_z0 -= 1
+    
+    if brick.z0 == destination_z0:
+        return
+
+    drop_brick_to(brick, destination_z0, occupied_cubes)
+
+def plummet_all(bricks, occupied_cubes):
     for brick in bricks:
-        plummet(brick)
+        plummet(brick, occupied_cubes)
 
 def bricks_below(brick):
     result = set()
@@ -99,6 +118,35 @@ def disintegration_candidate_count(bricks):
             count += 1
     return count
 
+def populate_occupied_cubes(bricks):
+    # Note that this does not track the middle cubes of vertical bricks
+    occupied_cubes = set()
+    for brick in bricks:
+        add_occupied_cubes(brick, occupied_cubes)
+    return occupied_cubes
+
+def is_occupied(x, y, z, occupied_cubes):
+    if z < 1:
+        return True
+    return (x, y, z) in occupied_cubes
+            
+def remove_occupied_cubes(brick, occupied_cubes):
+    for [x, y, z] in brick.top_cubes():
+        occupied_cubes.remove((x, y, z))
+    if brick.z0 == brick.z1:
+        return
+    for [x, y, z] in brick.bottom_cubes():
+        occupied_cubes.remove((x, y, z))
+
+def add_occupied_cubes(brick, occupied_cubes):
+    for [x, y, z] in brick.top_cubes():
+        occupied_cubes.add((x, y, z))
+    if brick.z0 == brick.z1:
+        return
+    for [x, y, z] in brick.bottom_cubes():
+        occupied_cubes.add((x, y, z))
+
 bricks = read_bricks()
-plummet_all(bricks)
+occupied_cubes = populate_occupied_cubes(bricks)
+plummet_all(bricks, occupied_cubes)
 print(disintegration_candidate_count(bricks))
