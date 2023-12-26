@@ -1,3 +1,17 @@
+class State:
+    def __init__(self, index, group, amount, this_spring, previous_spring):
+        self.index = index
+        self.group = group
+        self.amount = amount
+        self.this_spring = this_spring
+        self.previous_spring = previous_spring
+    
+    def __eq__(self, other):
+        return self.index == other.index and self.group == other.group and self.amount == other.amount and self.this_spring == other.this_spring and self.previous_spring == other.previous_spring
+    
+    def __hash__(self):
+        return self.index + 100 * self.group + 10000 * self.amount + 1000000 * ord(self.this_spring) + 10000000 * ord(self.previous_spring)
+
 def read_input_file_lines():
     with open('input.txt') as file:
         lines = [line.rstrip() for line in file]
@@ -26,68 +40,81 @@ def sum_of_possible_arrangement_counts(rows, damaged_segment_sizes):
     total = 0
     for index in range(len(rows)):
         print (f"Processing row {index} of {len(rows)-1}...")
-        total += possible_arrangement_counts(rows[index], damaged_segment_sizes[index], 0, 0, 0)
+        total += possible_arrangement_counts(rows[index], damaged_segment_sizes[index])
     return total
 
 def spring_at(row, index):
-    if index < 0:
-        return None
+    if index < 0 or index >= len(row):
+        return '.'
     return row[index]
 
-def possible_arrangement_counts(row, damaged_segment_sizes, group, amount, index):
-    # If we're at a '?' character, split the execution: Call this method again with that
-    # character replaced with '#' and with a '.'. Return the combined results.
-    if row[index] == '?':
-        total = 0
-        row_with_next_section_broken = row[:index] + '#' + row[index + 1:]
-        total += possible_arrangement_counts(row_with_next_section_broken, damaged_segment_sizes, group, amount, index)
-        row_with_next_section_undamaged = row[:index] + '.' + row[index + 1:]
-        total += possible_arrangement_counts(row_with_next_section_undamaged, damaged_segment_sizes, group, amount, index)
-        return total 
-    
-    if row[index] == '#':
-        amount += 1
-
-        # We're in a section of "#". If there have been too many sections, or if that section is too long, then not a valid permutation.
-        if group >= len(damaged_segment_sizes) or amount > damaged_segment_sizes[group]:
-            return 0
+def add_state(states, state, permutations, initial_permutations):
+    if state not in states:
+        states.add(state)
+        permutations[state] = initial_permutations
     else:
-        # If we were in a section of "#" and now we've hit a "." (or EOL), we've reached the
-        # end of that section. 
-        if spring_at(row, index - 1) == '#': 
-            # If that section was too short, not a valid permutation.
-            if amount < damaged_segment_sizes[group]:
-                return 0
+        permutations[state] += initial_permutations
 
-            # The section was the right size!
-            group += 1
-            amount = 0
+def possible_arrangement_counts(row, damaged_segment_sizes):
+    states = set()
+    initial_state = State(0, 0, 0, row[0], '.')
+    states.add(initial_state)
+    permutations = {}
+    permutations[initial_state] = 1
+    total_permutations = 0 
 
-    # On to the next index.
-    index += 1
+    while len(states) > 0:
+        state = states.pop()
 
-    if index == len(row):
-        # If we were in a section of "#" and now we've hit EOL, we've reached the
-        # end of that section. 
-        if spring_at(row, index - 1) == '#': 
-            # If that section was too short, not a valid permutation.
-            if amount < damaged_segment_sizes[group]:
-                return 0
+        # EOL
+        if state.index == len(row):
+            group = state.group
 
-            # The section was the right size!
-            group += 1
-            amount = 0
+            # Invalid state if the last '#' group was too short.
+            if state.previous_spring == '#':
+                if state.amount != damaged_segment_sizes[group]:
+                    continue
+                group += 1
 
-    # If we've reached the end of the row, and we had found the expected count of '#' groups, 
-    # then we've found a valid permutation.    
-    if index == len(row):
-        if group == len(damaged_segment_sizes):
-            return 1
-        else:
-            # We're at the end, but there were too few '#' groups.
-            return 0
+            # Invalid state if there weren't enough '#' groups.
+            if group < len(damaged_segment_sizes):
+                continue
 
-    return possible_arrangement_counts(row, damaged_segment_sizes, group, amount, index)
+            total_permutations += permutations[state]
+            continue
+
+        if state.this_spring == '?':
+            next_state = State(state.index, state.group, state.amount, '.', state.previous_spring)
+            add_state(states, next_state, permutations, permutations[state])
+            next_state = State(state.index, state.group, state.amount, '#', state.previous_spring)
+            add_state(states, next_state, permutations, permutations[state])
+            continue
+
+        if state.this_spring == '#':
+            amount = state.amount + 1
+
+            # We're in a section of "#". If there have been too many sections, or if that section is too long, then not a valid permutation.
+            if state.group >= len(damaged_segment_sizes) or amount > damaged_segment_sizes[state.group]:
+                continue
+
+            next_state = State(state.index + 1, state.group, amount, spring_at(row, state.index + 1), state.this_spring)
+            add_state(states, next_state, permutations, permutations[state])
+        else: # '.'
+            # If we were in a section of "#" and now we've hit a ".", we've reached the
+            # end of that section. 
+            if state.previous_spring == '#':
+                # If that section was too short, not a valid permutation.
+                if state.amount < damaged_segment_sizes[state.group]:
+                    continue
+
+                # The section was the right size!
+                next_state = State(state.index + 1, state.group + 1, 0, spring_at(row, state.index + 1), state.this_spring)
+                add_state(states, next_state, permutations, permutations[state])
+            else:
+                next_state = State(state.index + 1, state.group, 0, spring_at(row, state.index + 1), state.this_spring)                
+                add_state(states, next_state, permutations, permutations[state])
+
+    return total_permutations
 
 lines = read_input_file_lines()
 rows = read_rows(lines)
