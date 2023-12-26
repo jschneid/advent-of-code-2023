@@ -22,12 +22,22 @@ def random_node_pair(graph):
 def connected_node_count(graph, node_id):
     return len(nx.node_connected_component(graph, node_id))
 
+def average_path_length(graph, node_pairs):
+    total = 0
+    for node_pair in node_pairs:
+        total += nx.shortest_path_length(graph, *node_pair)
+    return total / len(node_pairs)
+
 def three_edges_to_remove(graph):
+    node_pairs = []
+    for _ in range(50):
+        node_pairs.append(random_node_pair(graph))
+
     average_shortest_path_length_with_edge_removed = {}
 
     for edge in graph.edges:
         graph.remove_edge(*edge)
-        average_shortest_path_length_with_edge_removed[edge] = nx.average_shortest_path_length(graph)
+        average_shortest_path_length_with_edge_removed[edge] = average_path_length(graph, node_pairs)
         graph.add_edge(*edge)
 
     average_shortest_path_length_with_edge_removed = dict(sorted(average_shortest_path_length_with_edge_removed.items(), key=lambda item: item[1] * -1))
